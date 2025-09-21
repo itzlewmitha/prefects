@@ -7,20 +7,23 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dashboard">
-    <header class="header">
-        <div class="container header-content">
+<header class="header">
+    <div class="container header-content">
+        <div>
             <h1>Prefect Attendance System</h1>
-            <button onclick="logout()" class="btn btn-secondary">Logout</button>
+            <small style="color: #f9c80e;">Logged in as: <span id="currentUser">Admin</span></small>
         </div>
-        <nav class="container">
-            <ul class="nav-menu">
-                <li class="nav-item"><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
-                <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
-                <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
-                <li class="nav-item"><a href="attendance.html" class="nav-link">Today's Attendance</a></li>
-            </ul>
-        </nav>
-    </header>
+        <button onclick="logout()" class="btn btn-secondary">Logout</button>
+    </div>
+    <nav class="container">
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+            <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
+            <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
+            <li class="nav-item"><a href="attendance.html" class="nav-link">Attendance Records</a></li>
+        </ul>
+    </nav>
+</header>
 
     <main class="container main-content">
         <div class="card">
@@ -50,4 +53,5 @@
     <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>
