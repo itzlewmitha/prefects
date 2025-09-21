@@ -1,17 +1,28 @@
 // Password for authentication (fallback)
 const SYSTEM_PASSWORD = "10058";
+let firebaseAvailable = false;
+
+// Check if Firebase is available
+function checkFirebaseAvailability() {
+  return !!(window.firebaseFunctions && typeof window.firebaseFunctions.loginUser === 'function');
+}
 
 // Check if user is logged in
 async function checkAuth() {
   try {
-    if (window.firebaseFunctions && window.firebaseFunctions.checkAuth) {
+    if (checkFirebaseAvailability()) {
+      firebaseAvailable = true;
       return await window.firebaseFunctions.checkAuth();
     } else {
       // Fallback to localStorage
+      firebaseAvailable = false;
+      document.getElementById('firebaseError').style.display = 'block';
       return localStorage.getItem('prefectAuth') === 'true';
     }
   } catch (error) {
     console.error("Error checking auth:", error);
+    firebaseAvailable = false;
+    document.getElementById('firebaseError').style.display = 'block';
     return localStorage.getItem('prefectAuth') === 'true';
   }
 }
@@ -26,22 +37,30 @@ async function requireAuth() {
 
 // Login functionality
 document.addEventListener('DOMContentLoaded', async function() {
-  // Initialize admin user
-  if (window.firebaseFunctions && window.firebaseFunctions.initializeAdmin) {
-    await window.firebaseFunctions.initializeAdmin();
+  // Check Firebase availability
+  firebaseAvailable = checkFirebaseAvailability();
+  
+  if (!firebaseAvailable) {
+    document.getElementById('firebaseError').style.display = 'block';
   }
   
   // Handle login form submission
   const loginForm = document.getElementById('loginForm');
+  const loadingElement = document.getElementById('loading');
+  const errorElement = document.getElementById('loginError');
+  
   if (loginForm) {
     loginForm.addEventListener('submit', async function(e) {
       e.preventDefault();
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-      const errorDiv = document.getElementById('loginError');
+      
+      // Show loading, hide error
+      loadingElement.style.display = 'block';
+      errorElement.style.display = 'none';
       
       try {
-        if (window.firebaseFunctions && window.firebaseFunctions.loginUser) {
+        if (firebaseAvailable) {
           // Use Firebase authentication
           await window.firebaseFunctions.loginUser(email, password);
           window.location.href = 'dashboard.html';
@@ -51,14 +70,32 @@ document.addEventListener('DOMContentLoaded', async function() {
             localStorage.setItem('prefectAuth', 'true');
             window.location.href = 'dashboard.html';
           } else {
-            errorDiv.textContent = 'Incorrect password. Please try again.';
-            errorDiv.style.display = 'block';
+            errorElement.textContent = 'Incorrect password. Please try again.';
+            errorElement.style.display = 'block';
           }
         }
       } catch (error) {
         console.error("Login error:", error);
-        errorDiv.textContent = 'Login failed. Please check your credentials.';
-        errorDiv.style.display = 'block';
+        
+        // Handle specific Firebase errors
+        if (error.code === 'auth/user-not-found') {
+          // Try to create the user
+          try {
+            await window.firebaseFunctions.createUser(email, password);
+            window.location.href = 'dashboard.html';
+          } catch (createError) {
+            errorElement.textContent = 'Login failed. Please check your credentials.';
+            errorElement.style.display = 'block';
+          }
+        } else if (error.code === 'auth/wrong-password') {
+          errorElement.textContent = 'Incorrect password. Please try again.';
+          errorElement.style.display = 'block';
+        } else {
+          errorElement.textContent = 'Login failed. Please check your credentials.';
+          errorElement.style.display = 'block';
+        }
+      } finally {
+        loadingElement.style.display = 'none';
       }
     });
   }
@@ -68,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await requireAuth();
     
     // Update UI with current user
-    if (window.firebaseFunctions && window.firebaseFunctions.getCurrentUser) {
+    if (firebaseAvailable && window.firebaseFunctions.getCurrentUser) {
       const user = window.firebaseFunctions.getCurrentUser();
       if (user) {
         const userElement = document.getElementById('currentUser');
@@ -96,37 +133,6 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 });
 
-// Prefects data management - using Firestore
-async function getPrefects() {
-  try {
-    if (window.firebaseFunctions && window.firebaseFunctions.getPrefectsOnce) {
-      return await window.firebaseFunctions.getPrefectsOnce();
-    } else {
-      // Fallback to localStorage if Firebase is not available
-      console.warn("Firebase not available, using localStorage fallback");
-      const prefects = localStorage.getItem('prefects');
-      return prefects ? JSON.parse(prefects) : [];
-    }
-  } catch (error) {
-    console.error("Error getting prefects:", error);
-    // Fallback to localStorage
-    const prefects = localStorage.getItem('prefects');
-    return prefects ? JSON.parse(prefects) : [];
-  }
-}
-
-// Real-time prefects listener
-function listenForPrefectsChanges(callback) {
-  if (window.firebaseFunctions && window.firebaseFunctions.getAllPrefects) {
-    return window.firebaseFunctions.getAllPrefects(callback);
-  } else {
-    console.warn("Firebase not available, cannot use real-time updates");
-    // Fallback: call callback once with current data
-    getPrefects().then(callback);
-    return () => {}; // Return empty unsubscribe function
-  }
-}
-
 // Format date for display and input
 function formatDate(date = new Date()) {
   return date.toISOString().split('T')[0];
@@ -141,7 +147,7 @@ function formatDateDisplay(dateString) {
 // Logout function
 async function logout() {
   try {
-    if (window.firebaseFunctions && window.firebaseFunctions.logoutUser) {
+    if (firebaseAvailable && window.firebaseFunctions.logoutUser) {
       await window.firebaseFunctions.logoutUser();
     }
     localStorage.removeItem('prefectAuth');
@@ -153,14 +159,31 @@ async function logout() {
   }
 }
 
+// Prefects data management
+async function getPrefects() {
+  try {
+    if (firebaseAvailable && window.firebaseFunctions.getAllPrefects) {
+      return await window.firebaseFunctions.getAllPrefects();
+    } else {
+      // Fallback to localStorage if Firebase is not available
+      const prefects = localStorage.getItem('prefects');
+      return prefects ? JSON.parse(prefects) : [];
+    }
+  } catch (error) {
+    console.error("Error getting prefects:", error);
+    // Fallback to localStorage
+    const prefects = localStorage.getItem('prefects');
+    return prefects ? JSON.parse(prefects) : [];
+  }
+}
+
 // Get attendance for a specific date
 async function getAttendanceByDate(date) {
   try {
-    if (window.firebaseFunctions && window.firebaseFunctions.getAttendanceByDate) {
+    if (firebaseAvailable && window.firebaseFunctions.getAttendanceByDate) {
       return await window.firebaseFunctions.getAttendanceByDate(date);
     } else {
       // Fallback to localStorage if Firebase is not available
-      console.warn("Firebase not available, using localStorage fallback");
       const attendanceData = JSON.parse(localStorage.getItem('attendance') || '{}');
       return attendanceData[date] || [];
     }
@@ -179,17 +202,16 @@ function updateAttendanceDisplay() {
   }
 }
 
-// Mark attendance using Firestore
+// Mark attendance
 async function markAttendanceWithFirestore(prefectId) {
   try {
-    if (window.firebaseFunctions && window.firebaseFunctions.markAttendance) {
+    if (firebaseAvailable && window.firebaseFunctions.markAttendance) {
       const timestamp = new Date().toISOString();
       const date = formatDate();
       await window.firebaseFunctions.markAttendance(prefectId, date, timestamp);
       return true;
     } else {
       // Fallback to localStorage if Firebase is not available
-      console.warn("Firebase not available, using localStorage fallback");
       const attendanceData = JSON.parse(localStorage.getItem('attendance') || '{}');
       const today = formatDate();
       
@@ -229,15 +251,14 @@ async function markAttendanceWithFirestore(prefectId) {
   }
 }
 
-// Add a new prefect using Firestore
+// Add a new prefect
 async function addPrefectWithFirestore(prefect) {
   try {
-    if (window.firebaseFunctions && window.firebaseFunctions.addPrefect) {
+    if (firebaseAvailable && window.firebaseFunctions.addPrefect) {
       const id = await window.firebaseFunctions.addPrefect(prefect);
       return id;
     } else {
       // Fallback to localStorage if Firebase is not available
-      console.warn("Firebase not available, using localStorage fallback");
       const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
       const prefectId = 'P' + Date.now();
       prefects.push({ id: prefectId, ...prefect });
@@ -250,14 +271,13 @@ async function addPrefectWithFirestore(prefect) {
   }
 }
 
-// Delete a prefect using Firestore
+// Delete a prefect
 async function deletePrefectWithFirestore(prefectId) {
   try {
-    if (window.firebaseFunctions && window.firebaseFunctions.deletePrefect) {
+    if (firebaseAvailable && window.firebaseFunctions.deletePrefect) {
       await window.firebaseFunctions.deletePrefect(prefectId);
     } else {
       // Fallback to localStorage if Firebase is not available
-      console.warn("Firebase not available, using localStorage fallback");
       const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
       const prefectIndex = prefects.findIndex(p => p.id === prefectId);
       
