@@ -75,8 +75,10 @@
         </div>
     </main>
 
-    <!-- QR Code scanning library -->
+    <!-- QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
     <script>
         // Set current date
@@ -88,13 +90,11 @@
             dateDisplay.textContent = formatDateDisplay(dateSelector.value);
         }
         
-        let html5QrcodeScanner = null;
-        
-        async function loadAttendance() {
+        function loadAttendance() {
             const selectedDate = document.getElementById('dateSelector').value;
-            const attendanceData = await getAttendanceByDate(selectedDate);
+            const attendanceData = getAttendanceByDate(selectedDate);
             const tableBody = document.getElementById('attendanceTableBody');
-            const prefects = await getPrefects();
+            const prefects = getPrefects();
             
             // Update date display
             dateDisplay.textContent = formatDateDisplay(selectedDate);
@@ -108,11 +108,6 @@
                 : 0;
             document.getElementById('attendanceRate').textContent = attendanceRate + '%';
             
-            if (attendanceData.length === 0 && prefects.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
-                return;
-            }
-            
             if (attendanceData.length === 0) {
                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No attendance recorded for this date.</td></tr>';
                 return;
@@ -120,7 +115,6 @@
             
             tableBody.innerHTML = '';
             
-            // Show present prefects
             attendanceData.forEach(record => {
                 const prefect = prefects.find(p => p.id === record.prefectId);
                 if (prefect) {
@@ -160,8 +154,7 @@
             const scannerContainer = document.getElementById('scannerContainer');
             scannerContainer.style.display = 'block';
             
-            // Initialize scanner
-            html5QrcodeScanner = new Html5QrcodeScanner(
+            const html5QrcodeScanner = new Html5QrcodeScanner(
                 "qr-reader", { fps: 10, qrbox: 250 });
             
             html5QrcodeScanner.render((decodedText, decodedResult) => {
@@ -171,19 +164,12 @@
                 // Stop scanner after successful scan
                 html5QrcodeScanner.clear();
                 scannerContainer.style.display = 'none';
-                html5QrcodeScanner = null;
             });
         });
         
         document.getElementById('stopScanner').addEventListener('click', function() {
             const scannerContainer = document.getElementById('scannerContainer');
             scannerContainer.style.display = 'none';
-            
-            // Stop scanner
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-                html5QrcodeScanner = null;
-            }
         });
         
         async function markAttendance(prefectId) {

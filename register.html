@@ -17,7 +17,7 @@
                 <li class="nav-item"><a href="dashboard.html" class="nav-link">Dashboard</a></li>
                 <li class="nav-item"><a href="register.html" class="nav-link active">Register Prefect</a></li>
                 <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
-                <li class="nav-item"><a href="attendance.html" class="nav-link">Attendance Records</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link">Today's Attendance</a></li>
             </ul>
         </nav>
     </header>
@@ -29,7 +29,7 @@
             </div>
             <div class="card-body">
                 <div class="face-scan-container">
-                    <h3>Step 1: Capture Prefect Image</h3>
+                    <h3>Step 1: Facial Recognition</h3>
                     <div class="video-container">
                         <video id="video" autoplay muted></video>
                     </div>
@@ -56,22 +56,24 @@
                     <button type="submit" class="btn">Register Prefect</button>
                 </form>
                 
-                <div id="qrResult" style="display: none; margin-top: 30px; text-align: center;">
+                <div id="qrResult" style="display: none; margin-top: 30px;">
                     <h3>Registration Successful!</h3>
                     <p>QR Code for attendance:</p>
                     <div id="qrcode" class="qr-container"></div>
                     <p>Scan this QR code to mark attendance for this prefect.</p>
-                    <button onclick="window.location.href='dashboard.html'" class="btn">Return to Dashboard</button>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- QR Code library -->
+    <!-- QR Code libraries -->
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
     <script>
-        // Simple face capture implementation
+        // Simple face capture implementation (for demonstration)
+        // In a real application, you would use a proper facial recognition library
         document.addEventListener('DOMContentLoaded', function() {
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
@@ -87,7 +89,7 @@
                     })
                     .catch(function(error) {
                         console.error("Camera error: ", error);
-                        alert("Unable to access camera. You can still register prefects without photo.");
+                        alert("Unable to access camera. Please check permissions.");
                     });
             }
             
@@ -98,11 +100,11 @@
                 canvas.height = video.videoHeight;
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                alert("Image captured successfully!");
+                alert("Face captured successfully!");
             });
             
             // Handle form submission
-            form.addEventListener('submit', async function(e) {
+            form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
                 const name = document.getElementById('name').value;
@@ -122,24 +124,21 @@
                     totalAttendance: 0
                 };
                 
-                try {
-                    // Save to Firestore or localStorage
-                    const savedId = await addPrefectWithFirestore(prefect);
-                    
-                    // Generate QR code with the prefect ID
-                    generateQRCode(savedId, 'qrcode');
-                    
-                    // Show result
-                    form.style.display = 'none';
-                    qrResult.style.display = 'block';
-                    
-                    // Stop camera
-                    if (video.srcObject) {
-                        video.srcObject.getTracks().forEach(track => track.stop());
-                    }
-                } catch (error) {
-                    console.error("Error registering prefect:", error);
-                    alert("Error registering prefect. Please try again.");
+                // Save to storage
+                const prefects = getPrefects();
+                prefects.push(prefect);
+                savePrefects(prefects);
+                
+                // Generate QR code
+                generateQRCode(prefectId, 'qrcode');
+                
+                // Show result
+                form.style.display = 'none';
+                qrResult.style.display = 'block';
+                
+                // Stop camera
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
                 }
             });
         });

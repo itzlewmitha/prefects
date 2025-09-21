@@ -17,7 +17,7 @@
                 <li class="nav-item"><a href="dashboard.html" class="nav-link">Dashboard</a></li>
                 <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
                 <li class="nav-item"><a href="view-prefects.html" class="nav-link active">View Prefects</a></li>
-                <li class="nav-item"><a href="attendance.html" class="nav-link">Attendance Records</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link">Today's Attendance</a></li>
             </ul>
         </nav>
     </header>
@@ -64,53 +64,47 @@
         </div>
     </div>
 
+    <!-- QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
     <script>
         let prefectToDelete = null;
         
-        async function loadPrefects() {
-            try {
-                const prefects = await getPrefects();
-                const tableBody = document.getElementById('prefectsTableBody');
-                
-                if (prefects.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
-                    return;
-                }
-                
-                tableBody.innerHTML = '';
-                
-                prefects.forEach(prefect => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${prefect.name}</td>
-                        <td>${prefect.grade}</td>
-                        <td>${prefect.admission}</td>
-                        <td>${prefect.totalAttendance || 0}</td>
-                        <td>
-                            <button onclick="viewPrefect('${prefect.id}')" class="btn btn-secondary" style="padding: 5px 10px; font-size: 14px;">View</button>
-                            <button onclick="showDeleteModal('${prefect.id}')" class="btn btn-danger" style="padding: 5px 10px; font-size: 14px;">Delete</button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-            } catch (error) {
-                console.error("Error loading prefects:", error);
-                const tableBody = document.getElementById('prefectsTableBody');
-                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red;">Error loading prefects. Please refresh the page.</td></tr>';
+        function loadPrefects() {
+            const prefects = getPrefects();
+            const tableBody = document.getElementById('prefectsTableBody');
+            
+            if (prefects.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
+                return;
             }
+            
+            tableBody.innerHTML = '';
+            prefects.forEach(prefect => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${prefect.name}</td>
+                    <td>${prefect.grade}</td>
+                    <td>${prefect.admission}</td>
+                    <td>${prefect.totalAttendance || 0}</td>
+                    <td>
+                        <button onclick="viewPrefect('${prefect.id}')" class="btn btn-secondary" style="padding: 5px 10px; font-size: 14px;">View</button>
+                        <button onclick="showDeleteModal('${prefect.id}')" class="btn btn-danger" style="padding: 5px 10px; font-size: 14px;">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
         }
         
         function viewPrefect(id) {
-            // In a real implementation, this would show a detailed view
-            // For now, we'll just show an alert with the ID
-            getPrefects().then(prefects => {
-                const prefect = prefects.find(p => p.id === id);
-                
-                if (prefect) {
-                    alert(`Prefect Details:\nName: ${prefect.name}\nGrade: ${prefect.grade}\nAdmission: ${prefect.admission}\nTotal Attendance: ${prefect.totalAttendance || 0}`);
-                }
-            });
+            const prefects = getPrefects();
+            const prefect = prefects.find(p => p.id === id);
+            
+            if (prefect) {
+                alert(`Prefect Details:\nName: ${prefect.name}\nGrade: ${prefect.grade}\nAdmission: ${prefect.admission}\nTotal Attendance: ${prefect.totalAttendance || 0}`);
+            }
         }
         
         function showDeleteModal(prefectId) {
