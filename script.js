@@ -1,5 +1,5 @@
 // Password for authentication (fallback)
-const SYSTEM_PASSWORD = "246810";
+const SYSTEM_PASSWORD = "10058";
 let firebaseAvailable = false;
 
 // Check if Firebase is available
@@ -303,5 +303,6 @@ async function deletePrefectWithFirestore(prefectId) {
     throw error;
   }
 }
+
 
 
