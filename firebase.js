@@ -1,6 +1,26 @@
 // Import the functions you need from the SDKs
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  getDoc, 
+  setDoc,
+  onSnapshot 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 // Your web app's Firebase configuration
 // Replace with your actual config from Firebase console
@@ -19,16 +39,62 @@ const app = initializeApp(firebaseConfig);
 // Initialize Cloud Firestore and get a reference to the service
 const db = getFirestore(app);
 
+// Initialize Firebase Authentication
+const auth = getAuth(app);
+
 // Prefects collection reference
 const prefectsCollection = collection(db, "prefects");
 
 // Attendance collection reference
 const attendanceCollection = collection(db, "attendance");
 
+// Admin collection reference
+const adminCollection = collection(db, "admin");
+
+// Function to check if user is authenticated
+function checkAuth() {
+  return new Promise((resolve) => {
+    onAuthStateChanged(auth, (user) => {
+      resolve(!!user);
+    });
+  });
+}
+
+// Function to login with email and password
+async function loginUser(email, password) {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error) {
+    console.error("Error signing in:", error);
+    throw error;
+  }
+}
+
+// Function to logout
+async function logoutUser() {
+  try {
+    await signOut(auth);
+    console.log("User signed out");
+  } catch (error) {
+    console.error("Error signing out:", error);
+    throw error;
+  }
+}
+
+// Function to get current user
+function getCurrentUser() {
+  return auth.currentUser;
+}
+
 // Function to add a new prefect
 async function addPrefect(prefect) {
   try {
-    const docRef = await addDoc(prefectsCollection, prefect);
+    const docRef = await addDoc(prefectsCollection, {
+      ...prefect,
+      createdAt: new Date().toISOString(),
+      createdBy: getCurrentUser()?.email || "unknown"
+    });
     console.log("Prefect added with ID: ", docRef.id);
     return docRef.id;
   } catch (e) {
@@ -37,26 +103,26 @@ async function addPrefect(prefect) {
   }
 }
 
-// Function to get all prefects
-async function getAllPrefects() {
-  try {
-    const querySnapshot = await getDocs(prefectsCollection);
+// Function to get all prefects with real-time updates
+function getAllPrefects(callback) {
+  return onSnapshot(prefectsCollection, (querySnapshot) => {
     const prefects = [];
     querySnapshot.forEach((doc) => {
       prefects.push({ id: doc.id, ...doc.data() });
     });
-    return prefects;
-  } catch (e) {
-    console.error("Error getting prefects: ", e);
-    throw e;
-  }
+    callback(prefects);
+  });
 }
 
 // Function to update a prefect
 async function updatePrefect(id, updates) {
   try {
     const prefectRef = doc(db, "prefects", id);
-    await updateDoc(prefectRef, updates);
+    await updateDoc(prefectRef, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+      updatedBy: getCurrentUser()?.email || "unknown"
+    });
     console.log("Prefect updated successfully");
   } catch (e) {
     console.error("Error updating prefect: ", e);
@@ -85,13 +151,14 @@ async function markAttendance(prefectId, date, timestamp) {
     await setDoc(attendanceRef, {
       prefectId: prefectId,
       date: date,
-      timestamp: timestamp
+      timestamp: timestamp,
+      markedBy: getCurrentUser()?.email || "unknown"
     });
     
     console.log("Attendance marked successfully");
     
     // Update the prefect's total attendance count
-    const prefects = await getAllPrefects();
+    const prefects = await getPrefectsOnce();
     const prefect = prefects.find(p => p.id === prefectId);
     if (prefect) {
       const newCount = (prefect.totalAttendance || 0) + 1;
@@ -99,6 +166,21 @@ async function markAttendance(prefectId, date, timestamp) {
     }
   } catch (e) {
     console.error("Error marking attendance: ", e);
+    throw e;
+  }
+}
+
+// Function to get prefects once (without real-time)
+async function getPrefectsOnce() {
+  try {
+    const querySnapshot = await getDocs(prefectsCollection);
+    const prefects = [];
+    querySnapshot.forEach((doc) => {
+      prefects.push({ id: doc.id, ...doc.data() });
+    });
+    return prefects;
+  } catch (e) {
+    console.error("Error getting prefects: ", e);
     throw e;
   }
 }
@@ -135,13 +217,41 @@ async function getPrefectAttendance(prefectId) {
   }
 }
 
+// Function to initialize admin user
+async function initializeAdmin() {
+  try {
+    // Check if admin already exists
+    const adminQuery = query(adminCollection, where("email", "==", "admin@prefectsystem.com"));
+    const querySnapshot = await getDocs(adminQuery);
+    
+    if (querySnapshot.empty) {
+      // Create admin user
+      await addDoc(adminCollection, {
+        email: "admin@prefectsystem.com",
+        password: "10058", // This should be hashed in a real application
+        role: "admin",
+        createdAt: new Date().toISOString()
+      });
+      console.log("Admin user initialized");
+    }
+  } catch (e) {
+    console.error("Error initializing admin: ", e);
+  }
+}
+
 // Export functions for use in other files
 window.firebaseFunctions = {
+  checkAuth,
+  loginUser,
+  logoutUser,
+  getCurrentUser,
   addPrefect,
   getAllPrefects,
   updatePrefect,
   deletePrefect,
   markAttendance,
   getAttendanceByDate,
-  getPrefectAttendance
+  getPrefectAttendance,
+  getPrefectsOnce,
+  initializeAdmin
 };
