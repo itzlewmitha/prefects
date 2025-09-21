@@ -5,6 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register Prefect</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1a4f8e;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body class="dashboard">
     <header class="header">
@@ -28,6 +48,10 @@
                 <h2 class="card-title">Register New Prefect</h2>
             </div>
             <div class="card-body">
+                <div id="authError" style="color: red; text-align: center; margin-bottom: 20px; display: none;">
+                    Authentication error. Please <a href="index.html">login again</a>.
+                </div>
+                
                 <div class="face-scan-container">
                     <h3>Step 1: Capture Prefect Image</h3>
                     <div class="video-container">
@@ -56,12 +80,20 @@
                     <button type="submit" class="btn">Register Prefect</button>
                 </form>
                 
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Registering prefect...</p>
+                </div>
+                
                 <div id="qrResult" style="display: none; margin-top: 30px; text-align: center;">
                     <h3>Registration Successful!</h3>
                     <p>QR Code for attendance:</p>
                     <div id="qrcode" class="qr-container"></div>
                     <p>Scan this QR code to mark attendance for this prefect.</p>
-                    <button onclick="window.location.href='dashboard.html'" class="btn">Return to Dashboard</button>
+                    <div style="margin-top: 20px;">
+                        <button onclick="window.location.href='dashboard.html'" class="btn" style="margin-right: 10px;">Return to Dashboard</button>
+                        <button onclick="window.location.href='register.html'" class="btn btn-secondary">Register Another Prefect</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -72,12 +104,22 @@
     <script src="script.js"></script>
     <script>
         // Simple face capture implementation
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if we're authenticated
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) {
+                document.getElementById('authError').style.display = 'block';
+                document.getElementById('prefectForm').style.display = 'none';
+                document.getElementById('captureBtn').style.display = 'none';
+                return;
+            }
+            
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
             const captureBtn = document.getElementById('captureBtn');
             const form = document.getElementById('prefectForm');
             const qrResult = document.getElementById('qrResult');
+            const loadingElement = document.getElementById('loading');
             
             // Access camera
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -109,6 +151,10 @@
                 const grade = document.getElementById('grade').value;
                 const admission = document.getElementById('admission').value;
                 
+                // Show loading, hide form
+                loadingElement.style.display = 'block';
+                form.style.display = 'none';
+                
                 // Generate a unique ID for the prefect
                 const prefectId = 'P' + Date.now();
                 
@@ -129,8 +175,8 @@
                     // Generate QR code with the prefect ID
                     generateQRCode(savedId, 'qrcode');
                     
-                    // Show result
-                    form.style.display = 'none';
+                    // Show result, hide loading
+                    loadingElement.style.display = 'none';
                     qrResult.style.display = 'block';
                     
                     // Stop camera
@@ -139,6 +185,9 @@
                     }
                 } catch (error) {
                     console.error("Error registering prefect:", error);
+                    // Show form again, hide loading
+                    loadingElement.style.display = 'none';
+                    form.style.display = 'block';
                     alert("Error registering prefect. Please try again.");
                 }
             });
