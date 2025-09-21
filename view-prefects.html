@@ -67,6 +67,7 @@
     <!-- QR Code libraries -->
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
     <script>
         let prefectToDelete = null;
@@ -118,29 +119,18 @@
             prefectToDelete = null;
         }
         
-        function deletePrefect() {
+        async function deletePrefect() {
             if (!prefectToDelete) return;
             
-            const prefects = getPrefects();
-            const prefectIndex = prefects.findIndex(p => p.id === prefectToDelete);
-            
-            if (prefectIndex !== -1) {
-                // Remove the prefect
-                prefects.splice(prefectIndex, 1);
-                savePrefects(prefects);
-                
-                // Clean up attendance records
-                const attendanceData = getAttendance();
-                for (const date in attendanceData) {
-                    attendanceData[date] = attendanceData[date].filter(
-                        record => record.prefectId !== prefectToDelete
-                    );
-                }
-                saveAttendance(attendanceData);
+            try {
+                await deletePrefectWithFirestore(prefectToDelete);
                 
                 // Reload the table
-                loadPrefects();
+                await loadPrefects();
                 alert('Prefect deleted successfully');
+            } catch (error) {
+                console.error("Error deleting prefect:", error);
+                alert("Error deleting prefect. Please try again.");
             }
             
             hideDeleteModal();

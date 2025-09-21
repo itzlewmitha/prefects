@@ -78,6 +78,7 @@
     <!-- QR Code libraries -->
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
     <script>
         // Set current date
@@ -171,8 +172,8 @@
             scannerContainer.style.display = 'none';
         });
         
-        function markAttendance(prefectId) {
-            const prefects = getPrefects();
+        async function markAttendance(prefectId) {
+            const prefects = await getPrefects();
             const prefect = prefects.find(p => p.id === prefectId);
             
             if (!prefect) {
@@ -180,41 +181,22 @@
                 return;
             }
             
-            const attendanceData = getAttendance();
-            const today = formatDate();
-            
-            if (!attendanceData[today]) {
-                attendanceData[today] = [];
-            }
-            
-            // Check if already marked attendance today
-            const alreadyMarked = attendanceData[today].some(record => 
-                record.prefectId === prefectId
-            );
-            
-            if (alreadyMarked) {
-                alert(`${prefect.name} has already marked attendance today.`);
-                return;
-            }
-            
-            // Add attendance record
-            attendanceData[today].push({
-                prefectId: prefectId,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Update prefect's total attendance
-            prefect.totalAttendance = (prefect.totalAttendance || 0) + 1;
-            
-            // Save data
-            saveAttendance(attendanceData);
-            savePrefects(prefects);
-            
-            alert(`Attendance marked for ${prefect.name}`);
-            
-            // Refresh the attendance table if viewing today
-            if (document.getElementById('dateSelector').value === formatDate()) {
-                loadAttendance();
+            try {
+                const success = await markAttendanceWithFirestore(prefectId);
+                
+                if (success) {
+                    alert(`Attendance marked for ${prefect.name}`);
+                    
+                    // Refresh the attendance table if viewing today
+                    if (document.getElementById('dateSelector').value === formatDate()) {
+                        loadAttendance();
+                    }
+                } else {
+                    alert(`${prefect.name} has already marked attendance today.`);
+                }
+            } catch (error) {
+                console.error("Error marking attendance:", error);
+                alert("Error marking attendance. Please try again.");
             }
         }
         
