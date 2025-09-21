@@ -1,5 +1,5 @@
 // Password for authentication (fallback)
-const SYSTEM_PASSWORD = "10058";
+const SYSTEM_PASSWORD = "100580";
 let firebaseAvailable = false;
 
 // Check if Firebase is available
@@ -12,31 +12,33 @@ async function checkAuth() {
   try {
     if (checkFirebaseAvailability()) {
       firebaseAvailable = true;
-      return await window.firebaseFunctions.checkAuth();
+      const isAuthenticated = await window.firebaseFunctions.checkAuth();
+      return isAuthenticated;
     } else {
       // Fallback to localStorage
       firebaseAvailable = false;
-      if (document.getElementById('firebaseError')) {
-        document.getElementById('firebaseError').style.display = 'block';
-      }
       return localStorage.getItem('prefectAuth') === 'true';
     }
   } catch (error) {
     console.error("Error checking auth:", error);
     firebaseAvailable = false;
-    if (document.getElementById('firebaseError')) {
-      document.getElementById('firebaseError').style.display = 'block';
-    }
     return localStorage.getItem('prefectAuth') === 'true';
   }
 }
 
 // Redirect to login if not authenticated
 async function requireAuth() {
-  const isAuthenticated = await checkAuth();
-  if (!isAuthenticated && !window.location.pathname.endsWith('index.html')) {
-    window.location.href = 'index.html';
+  // Don't require auth for login page
+  if (window.location.pathname.endsWith('index.html')) {
+    return;
   }
+  
+  const isAuthenticated = await checkAuth();
+  if (!isAuthenticated) {
+    window.location.href = 'index.html';
+    return false;
+  }
+  return true;
 }
 
 // Login functionality
@@ -93,25 +95,39 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
   }
   
-  // Check authentication on other pages
+  // Check authentication on other pages (except login page)
   if (!window.location.pathname.endsWith('index.html')) {
-    await requireAuth();
-  }
-  
-  // Load prefects data
-  if (typeof loadPrefects === 'function') {
-    loadPrefects();
-  }
-  
-  // Load attendance data
-  if (typeof loadAttendance === 'function') {
-    loadAttendance();
-  }
-  
-  // Set default date to today
-  const dateInput = document.getElementById('dateSelector');
-  if (dateInput) {
-    dateInput.value = formatDate();
+    const isAuthenticated = await requireAuth();
+    
+    // Only load page content if authenticated
+    if (isAuthenticated) {
+      // Update UI with current user
+      if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.getCurrentUser) {
+        const user = window.firebaseFunctions.getCurrentUser();
+        if (user) {
+          const userElement = document.getElementById('currentUser');
+          if (userElement) {
+            userElement.textContent = user.email;
+          }
+        }
+      }
+      
+      // Load prefects data
+      if (typeof loadPrefects === 'function') {
+        loadPrefects();
+      }
+      
+      // Load attendance data
+      if (typeof loadAttendance === 'function') {
+        loadAttendance();
+      }
+      
+      // Set default date to today
+      const dateInput = document.getElementById('dateSelector');
+      if (dateInput) {
+        dateInput.value = formatDate();
+      }
+    }
   }
 });
 
@@ -303,6 +319,3 @@ async function deletePrefectWithFirestore(prefectId) {
     throw error;
   }
 }
-
-
-
