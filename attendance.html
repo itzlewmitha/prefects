@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Records</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard">
+    <header class="header">
+        <div class="container header-content">
+            <h1>Prefect Attendance System</h1>
+            <button onclick="logout()" class="btn btn-secondary">Logout</button>
+        </div>
+        <nav class="container">
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
+                <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link active">Attendance Records</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container main-content">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Attendance Records</h2>
+                <button id="scanBtn" class="btn">Scan QR Code</button>
+            </div>
+            <div class="card-body">
+                <div class="date-selector">
+                    <label for="dateSelector" class="form-label">Select Date:</label>
+                    <input type="date" id="dateSelector" class="form-control" style="max-width: 200px;">
+                    <button onclick="updateAttendanceDisplay()" class="btn">Load Attendance</button>
+                </div>
+                
+                <div id="scannerContainer" style="display: none; text-align: center; margin-bottom: 20px;">
+                    <div id="qr-reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+                    <button id="stopScanner" class="btn btn-secondary" style="margin-top: 15px;">Stop Scanner</button>
+                </div>
+                
+                <h3 id="selectedDateTitle" style="margin-bottom: 20px;">Attendance for <span id="dateDisplay"></span></h3>
+                
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Prefects</div>
+                        <div class="stat-number" id="totalPrefects">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Present Today</div>
+                        <div class="stat-number" id="presentToday">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Attendance Rate</div>
+                        <div class="stat-number" id="attendanceRate">0%</div>
+                    </div>
+                </div>
+                
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Admission No.</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody">
+                        <!-- Attendance will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Set current date
+        const dateSelector = document.getElementById('dateSelector');
+        const dateDisplay = document.getElementById('dateDisplay');
+        
+        if (dateSelector) {
+            dateSelector.value = formatDate();
+            dateDisplay.textContent = formatDateDisplay(dateSelector.value);
+        }
+        
+        function loadAttendance() {
+            const selectedDate = document.getElementById('dateSelector').value;
+            const attendanceData = getAttendanceByDate(selectedDate);
+            const tableBody = document.getElementById('attendanceTableBody');
+            const prefects = getPrefects();
+            
+            // Update date display
+            dateDisplay.textContent = formatDateDisplay(selectedDate);
+            
+            // Update stats
+            document.getElementById('totalPrefects').textContent = prefects.length;
+            document.getElementById('presentToday').textContent = attendanceData.length;
+            
+            const attendanceRate = prefects.length > 0 
+                ? Math.round((attendanceData.length / prefects.length) * 100) 
+                : 0;
+            document.getElementById('attendanceRate').textContent = attendanceRate + '%';
+            
+            if (attendanceData.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No attendance recorded for this date.</td></tr>';
+                return;
+            }
+            
+            tableBody.innerHTML = '';
+            
+            attendanceData.forEach(record => {
+                const prefect = prefects.find(p => p.id === record.prefectId);
+                if (prefect) {
+                    const row = document.createElement('tr');
+                    const time = new Date(record.timestamp).toLocaleTimeString();
+                    
+                    row.innerHTML = `
+                        <td>${prefect.name}</td>
+                        <td>${prefect.grade}</td>
+                        <td>${prefect.admission}</td>
+                        <td>${time}</td>
+                        <td><span style="color: green; font-weight: bold;">Present</span></td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+            });
+            
+            // Also show absent prefects
+            const presentPrefectIds = attendanceData.map(record => record.prefectId);
+            const absentPrefects = prefects.filter(prefect => !presentPrefectIds.includes(prefect.id));
+            
+            absentPrefects.forEach(prefect => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${prefect.name}</td>
+                    <td>${prefect.grade}</td>
+                    <td>${prefect.admission}</td>
+                    <td>-</td>
+                    <td><span style="color: red; font-weight: bold;">Absent</span></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // QR Code scanning
+        document.getElementById('scanBtn').addEventListener('click', function() {
+            const scannerContainer = document.getElementById('scannerContainer');
+            scannerContainer.style.display = 'block';
+            
+            const html5QrcodeScanner = new Html5QrcodeScanner(
+                "qr-reader", { fps: 10, qrbox: 250 });
+            
+            html5QrcodeScanner.render((decodedText, decodedResult) => {
+                // Handle successful scan
+                markAttendance(decodedText);
+                
+                // Stop scanner after successful scan
+                html5QrcodeScanner.clear();
+                scannerContainer.style.display = 'none';
+            });
+        });
+        
+        document.getElementById('stopScanner').addEventListener('click', function() {
+            const scannerContainer = document.getElementById('scannerContainer');
+            scannerContainer.style.display = 'none';
+        });
+        
+        function markAttendance(prefectId) {
+            const prefects = getPrefects();
+            const prefect = prefects.find(p => p.id === prefectId);
+            
+            if (!prefect) {
+                alert('Invalid QR code. Prefect not found.');
+                return;
+            }
+            
+            const attendanceData = getAttendance();
+            const today = formatDate();
+            
+            if (!attendanceData[today]) {
+                attendanceData[today] = [];
+            }
+            
+            // Check if already marked attendance today
+            const alreadyMarked = attendanceData[today].some(record => 
+                record.prefectId === prefectId
+            );
+            
+            if (alreadyMarked) {
+                alert(`${prefect.name} has already marked attendance today.`);
+                return;
+            }
+            
+            // Add attendance record
+            attendanceData[today].push({
+                prefectId: prefectId,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Update prefect's total attendance
+            prefect.totalAttendance = (prefect.totalAttendance || 0) + 1;
+            
+            // Save data
+            saveAttendance(attendanceData);
+            savePrefects(prefects);
+            
+            alert(`Attendance marked for ${prefect.name}`);
+            
+            // Refresh the attendance table if viewing today
+            if (document.getElementById('dateSelector').value === formatDate()) {
+                loadAttendance();
+            }
+        }
+        
+        // Load attendance on page load
+        document.addEventListener('DOMContentLoaded', loadAttendance);
+    </script>
+</body>
+</html>

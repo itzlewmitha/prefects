@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prefect Attendance - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard">
+    <header class="header">
+        <div class="container header-content">
+            <h1>Prefect Attendance System</h1>
+            <button onclick="logout()" class="btn btn-secondary">Logout</button>
+        </div>
+        <nav class="container">
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
+                <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link">Today's Attendance</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container main-content">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">System Overview</h2>
+            </div>
+            <div class="card-body">
+                <p>Welcome to the Prefect Attendance System. Use the navigation menu to:</p>
+                <ul>
+                    <li>Register new prefects with facial recognition</li>
+                    <li>View and manage existing prefects</li>
+                    <li>Check today's attendance records</li>
+                    <li>Scan QR codes to mark attendance</li>
+                </ul>
+                
+                <div style="margin-top: 30px; text-align: center;">
+                    <a href="register.html" class="btn" style="margin-right: 10px;">Register New Prefect</a>
+                    <a href="view-prefects.html" class="btn btn-secondary">View All Prefects</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

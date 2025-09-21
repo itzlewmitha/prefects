@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Prefects</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard">
+    <header class="header">
+        <div class="container header-content">
+            <h1>Prefect Attendance System</h1>
+            <button onclick="logout()" class="btn btn-secondary">Logout</button>
+        </div>
+        <nav class="container">
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
+                <li class="nav-item"><a href="view-prefects.html" class="nav-link active">View Prefects</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link">Today's Attendance</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container main-content">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">All Prefects</h2>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Admission No.</th>
+                            <th>Total Attendance</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prefectsTableBody">
+                        <!-- Prefects will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirm Deletion</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this prefect? This action cannot be undone.</p>
+                <p>All attendance records for this prefect will also be removed.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirmDelete" class="btn btn-danger">Delete</button>
+                <button id="cancelDelete" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+        let prefectToDelete = null;
+        
+        function loadPrefects() {
+            const prefects = getPrefects();
+            const tableBody = document.getElementById('prefectsTableBody');
+            
+            if (prefects.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
+                return;
+            }
+            
+            tableBody.innerHTML = '';
+            prefects.forEach(prefect => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${prefect.name}</td>
+                    <td>${prefect.grade}</td>
+                    <td>${prefect.admission}</td>
+                    <td>${prefect.totalAttendance || 0}</td>
+                    <td>
+                        <button onclick="viewPrefect('${prefect.id}')" class="btn btn-secondary" style="padding: 5px 10px; font-size: 14px;">View</button>
+                        <button onclick="showDeleteModal('${prefect.id}')" class="btn btn-danger" style="padding: 5px 10px; font-size: 14px;">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function viewPrefect(id) {
+            const prefects = getPrefects();
+            const prefect = prefects.find(p => p.id === id);
+            
+            if (prefect) {
+                alert(`Prefect Details:\nName: ${prefect.name}\nGrade: ${prefect.grade}\nAdmission: ${prefect.admission}\nTotal Attendance: ${prefect.totalAttendance || 0}`);
+            }
+        }
+        
+        function showDeleteModal(prefectId) {
+            prefectToDelete = prefectId;
+            const modal = document.getElementById('deleteModal');
+            modal.style.display = 'block';
+        }
+        
+        function hideDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.style.display = 'none';
+            prefectToDelete = null;
+        }
+        
+        function deletePrefect() {
+            if (!prefectToDelete) return;
+            
+            const prefects = getPrefects();
+            const prefectIndex = prefects.findIndex(p => p.id === prefectToDelete);
+            
+            if (prefectIndex !== -1) {
+                // Remove the prefect
+                prefects.splice(prefectIndex, 1);
+                savePrefects(prefects);
+                
+                // Clean up attendance records
+                const attendanceData = getAttendance();
+                for (const date in attendanceData) {
+                    attendanceData[date] = attendanceData[date].filter(
+                        record => record.prefectId !== prefectToDelete
+                    );
+                }
+                saveAttendance(attendanceData);
+                
+                // Reload the table
+                loadPrefects();
+                alert('Prefect deleted successfully');
+            }
+            
+            hideDeleteModal();
+        }
+        
+        // Set up modal event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('confirmDelete').addEventListener('click', deletePrefect);
+            document.getElementById('cancelDelete').addEventListener('click', hideDeleteModal);
+            document.querySelector('.close').addEventListener('click', hideDeleteModal);
+            
+            // Close modal when clicking outside
+            window.addEventListener('click', function(event) {
+                const modal = document.getElementById('deleteModal');
+                if (event.target === modal) {
+                    hideDeleteModal();
+                }
+            });
+            
+            // Load prefects on page load
+            loadPrefects();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Prefect</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard">
+    <header class="header">
+        <div class="container header-content">
+            <h1>Prefect Attendance System</h1>
+            <button onclick="logout()" class="btn btn-secondary">Logout</button>
+        </div>
+        <nav class="container">
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                <li class="nav-item"><a href="register.html" class="nav-link active">Register Prefect</a></li>
+                <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link">Today's Attendance</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container main-content">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Register New Prefect</h2>
+            </div>
+            <div class="card-body">
+                <div class="face-scan-container">
+                    <h3>Step 1: Facial Recognition</h3>
+                    <div class="video-container">
+                        <video id="video" autoplay muted></video>
+                    </div>
+                    <button id="captureBtn" class="btn">Capture Image</button>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                </div>
+
+                <form id="prefectForm" style="margin-top: 30px;">
+                    <div class="form-group">
+                        <label class="form-label" for="name">Full Name</label>
+                        <input type="text" id="name" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="grade">Grade/Class</label>
+                        <input type="text" id="grade" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="admission">Admission Number</label>
+                        <input type="text" id="admission" class="form-control" required>
+                    </div>
+                    
+                    <button type="submit" class="btn">Register Prefect</button>
+                </form>
+                
+                <div id="qrResult" style="display: none; margin-top: 30px;">
+                    <h3>Registration Successful!</h3>
+                    <p>QR Code for attendance:</p>
+                    <div id="qrcode" class="qr-container"></div>
+                    <p>Scan this QR code to mark attendance for this prefect.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Simple face capture implementation (for demonstration)
+        // In a real application, you would use a proper facial recognition library
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const captureBtn = document.getElementById('captureBtn');
+            const form = document.getElementById('prefectForm');
+            const qrResult = document.getElementById('qrResult');
+            
+            // Access camera
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                        video.srcObject = stream;
+                    })
+                    .catch(function(error) {
+                        console.error("Camera error: ", error);
+                        alert("Unable to access camera. Please check permissions.");
+                    });
+            }
+            
+            // Capture image
+            captureBtn.addEventListener('click', function() {
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                alert("Face captured successfully!");
+            });
+            
+            // Handle form submission
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('name').value;
+                const grade = document.getElementById('grade').value;
+                const admission = document.getElementById('admission').value;
+                
+                // Generate a unique ID for the prefect
+                const prefectId = 'P' + Date.now();
+                
+                // Create prefect object
+                const prefect = {
+                    id: prefectId,
+                    name: name,
+                    grade: grade,
+                    admission: admission,
+                    registrationDate: new Date().toISOString(),
+                    totalAttendance: 0
+                };
+                
+                // Save to storage
+                const prefects = getPrefects();
+                prefects.push(prefect);
+                savePrefects(prefects);
+                
+                // Generate QR code
+                generateQRCode(prefectId, 'qrcode');
+                
+                // Show result
+                form.style.display = 'none';
+                qrResult.style.display = 'block';
+                
+                // Stop camera
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+            });
+        });
+    </script>
+</body>
+</html>
