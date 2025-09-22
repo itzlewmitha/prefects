@@ -10,20 +10,17 @@ import {
   doc, 
   query, 
   where, 
-  getDoc, 
-  setDoc,
-  onSnapshot 
+  setDoc 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 // Your web app's Firebase configuration
-// Replace with your actual config from Firebase console
 const firebaseConfig = {
   apiKey: "AIzaSyDOdJVAU_MC4l7m2ymZVjWhqsc6ERIK78A",
   authDomain: "prefects-src.firebaseapp.com",
@@ -48,9 +45,6 @@ const prefectsCollection = collection(db, "prefects");
 // Attendance collection reference
 const attendanceCollection = collection(db, "attendance");
 
-// Admin collection reference
-const adminCollection = collection(db, "admin");
-
 // Function to check if user is authenticated
 function checkAuth() {
   return new Promise((resolve) => {
@@ -67,6 +61,17 @@ async function loginUser(email, password) {
     return userCredential.user;
   } catch (error) {
     console.error("Error signing in:", error);
+    throw error;
+  }
+}
+
+// Function to create a new user
+async function createUser(email, password) {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error) {
+    console.error("Error creating user:", error);
     throw error;
   }
 }
@@ -103,15 +108,19 @@ async function addPrefect(prefect) {
   }
 }
 
-// Function to get all prefects with real-time updates
-function getAllPrefects(callback) {
-  return onSnapshot(prefectsCollection, (querySnapshot) => {
+// Function to get all prefects
+async function getAllPrefects() {
+  try {
+    const querySnapshot = await getDocs(prefectsCollection);
     const prefects = [];
     querySnapshot.forEach((doc) => {
       prefects.push({ id: doc.id, ...doc.data() });
     });
-    callback(prefects);
-  });
+    return prefects;
+  } catch (e) {
+    console.error("Error getting prefects: ", e);
+    throw e;
+  }
 }
 
 // Function to update a prefect
@@ -158,7 +167,7 @@ async function markAttendance(prefectId, date, timestamp) {
     console.log("Attendance marked successfully");
     
     // Update the prefect's total attendance count
-    const prefects = await getPrefectsOnce();
+    const prefects = await getAllPrefects();
     const prefect = prefects.find(p => p.id === prefectId);
     if (prefect) {
       const newCount = (prefect.totalAttendance || 0) + 1;
@@ -166,21 +175,6 @@ async function markAttendance(prefectId, date, timestamp) {
     }
   } catch (e) {
     console.error("Error marking attendance: ", e);
-    throw e;
-  }
-}
-
-// Function to get prefects once (without real-time)
-async function getPrefectsOnce() {
-  try {
-    const querySnapshot = await getDocs(prefectsCollection);
-    const prefects = [];
-    querySnapshot.forEach((doc) => {
-      prefects.push({ id: doc.id, ...doc.data() });
-    });
-    return prefects;
-  } catch (e) {
-    console.error("Error getting prefects: ", e);
     throw e;
   }
 }
@@ -201,41 +195,15 @@ async function getAttendanceByDate(date) {
   }
 }
 
-// Function to get all attendance records for a prefect
-async function getPrefectAttendance(prefectId) {
-  try {
-    const q = query(attendanceCollection, where("prefectId", "==", prefectId));
-    const querySnapshot = await getDocs(q);
-    const attendance = [];
-    querySnapshot.forEach((doc) => {
-      attendance.push({ id: doc.id, ...doc.data() });
-    });
-    return attendance;
-  } catch (e) {
-    console.error("Error getting prefect attendance: ", e);
-    throw e;
-  }
-}
-
 // Function to initialize admin user
 async function initializeAdmin() {
   try {
-    // Check if admin already exists
-    const adminQuery = query(adminCollection, where("email", "==", "admin@prefectsystem.com"));
-    const querySnapshot = await getDocs(adminQuery);
-    
-    if (querySnapshot.empty) {
-      // Create admin user
-      await addDoc(adminCollection, {
-        email: "admin@prefectsystem.com",
-        password: "10058", // This should be hashed in a real application
-        role: "admin",
-        createdAt: new Date().toISOString()
-      });
-      console.log("Admin user initialized");
-    }
-  } catch (e) {
-    console.error("Error initializing admin: ", e);
+    // Try to create admin user - it will fail if already exists, which is fine
+    await createUser("admin@prefectsystem.com", "10058");
+    console.log("Admin user created or already exists");
+  } catch (error) {
+    // User likely already exists, which is fine
+    console.log("Admin user already exists or error creating:", error.message);
   }
 }
 
@@ -251,7 +219,5 @@ window.firebaseFunctions = {
   deletePrefect,
   markAttendance,
   getAttendanceByDate,
-  getPrefectAttendance,
-  getPrefectsOnce,
   initializeAdmin
 };
