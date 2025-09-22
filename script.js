@@ -30,7 +30,7 @@ async function checkAuth() {
 async function requireAuth() {
   // Don't require auth for login page
   if (window.location.pathname.endsWith('index.html')) {
-    return;
+    return true;
   }
   
   const isAuthenticated = await checkAuth();
@@ -161,11 +161,17 @@ async function logout() {
 async function getPrefects() {
   try {
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.getAllPrefects) {
-      return await window.firebaseFunctions.getAllPrefects();
+      console.log("Getting prefects from Firebase");
+      const prefects = await window.firebaseFunctions.getAllPrefects();
+      console.log("Firebase prefects:", prefects);
+      return prefects;
     } else {
       // Fallback to localStorage if Firebase is not available
+      console.log("Getting prefects from localStorage");
       const prefects = localStorage.getItem('prefects');
-      return prefects ? JSON.parse(prefects) : [];
+      const parsedPrefects = prefects ? JSON.parse(prefects) : [];
+      console.log("LocalStorage prefects:", parsedPrefects);
+      return parsedPrefects;
     }
   } catch (error) {
     console.error("Error getting prefects:", error);
@@ -275,13 +281,16 @@ async function addPrefectWithFirestore(prefect) {
   try {
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.addPrefect) {
       const id = await window.firebaseFunctions.addPrefect(prefect);
+      console.log("Prefect added to Firebase with ID:", id);
       return id;
     } else {
       // Fallback to localStorage if Firebase is not available
       const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
       const prefectId = prefect.id || 'P' + Date.now();
-      prefects.push({ ...prefect, id: prefectId });
+      const newPrefect = { ...prefect, id: prefectId };
+      prefects.push(newPrefect);
       localStorage.setItem('prefects', JSON.stringify(prefects));
+      console.log("Prefect added to localStorage with ID:", prefectId);
       return prefectId;
     }
   } catch (error) {
@@ -317,5 +326,18 @@ async function deletePrefectWithFirestore(prefectId) {
   } catch (error) {
     console.error("Error deleting prefect:", error);
     throw error;
+  }
+}
+
+// Debug function to check storage
+function debugStorage() {
+  console.log("=== Storage Debug ===");
+  console.log("LocalStorage prefects:", localStorage.getItem('prefects'));
+  console.log("LocalStorage attendance:", localStorage.getItem('attendance'));
+  
+  if (firebaseAvailable && window.firebaseFunctions.getAllPrefects) {
+    window.firebaseFunctions.getAllPrefects().then(prefects => {
+      console.log("Firebase prefects:", prefects);
+    });
   }
 }
