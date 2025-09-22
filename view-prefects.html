@@ -5,6 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Prefects</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1a4f8e;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body class="dashboard">
     <header class="header">
@@ -26,8 +46,18 @@
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">All Prefects</h2>
+                <button onclick="refreshPrefects()" class="btn btn-secondary">Refresh</button>
             </div>
             <div class="card-body">
+                <div id="authError" style="color: red; text-align: center; margin-bottom: 20px; display: none;">
+                    Authentication error. Please <a href="index.html">login again</a>.
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Loading prefects...</p>
+                </div>
+                
                 <table class="table">
                     <thead>
                         <tr>
@@ -63,17 +93,28 @@
             </div>
         </div>
     </div>
+
+    <!-- Firebase and QR Code libraries -->
+    <script type="module" src="firebase.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
     <script src="script.js"></script>
     <script>
         let prefectToDelete = null;
         
         async function loadPrefects() {
             try {
+                // Show loading, hide error
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('authError').style.display = 'none';
+                
                 const prefects = await getPrefects();
                 const tableBody = document.getElementById('prefectsTableBody');
                 
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                
                 if (prefects.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet. <a href="register.html">Register a prefect</a></td></tr>';
                     return;
                 }
                 
@@ -82,9 +123,9 @@
                 prefects.forEach(prefect => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${prefect.name}</td>
-                        <td>${prefect.grade}</td>
-                        <td>${prefect.admission}</td>
+                        <td>${prefect.name || 'Unknown'}</td>
+                        <td>${prefect.grade || 'N/A'}</td>
+                        <td>${prefect.admission || 'N/A'}</td>
                         <td>${prefect.totalAttendance || 0}</td>
                         <td>
                             <button onclick="viewPrefect('${prefect.id}')" class="btn btn-secondary" style="padding: 5px 10px; font-size: 14px;">View</button>
@@ -95,21 +136,33 @@
                 });
             } catch (error) {
                 console.error("Error loading prefects:", error);
+                // Hide loading, show error
+                document.getElementById('loading').style.display = 'none';
+                
                 const tableBody = document.getElementById('prefectsTableBody');
                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red;">Error loading prefects. Please refresh the page.</td></tr>';
             }
         }
         
-        function viewPrefect(id) {
-            // In a real implementation, this would show a detailed view
-            // For now, we'll just show an alert with the ID
-            getPrefects().then(prefects => {
+        function refreshPrefects() {
+            loadPrefects();
+        }
+        
+        async function viewPrefect(id) {
+            try {
+                const prefects = await getPrefects();
                 const prefect = prefects.find(p => p.id === id);
                 
                 if (prefect) {
-                    alert(`Prefect Details:\nName: ${prefect.name}\nGrade: ${prefect.grade}\nAdmission: ${prefect.admission}\nTotal Attendance: ${prefect.totalAttendance || 0}`);
+                    alert(`Prefect Details:\nName: ${prefect.name}\nGrade: ${prefect.grade}\nAdmission: ${prefect.admission}\nTotal Attendance: ${prefect.totalAttendance || 0}\nID: ${prefect.id}`);
+                } else {
+                    alert('Prefect not found. It may have been deleted.');
+                    loadPrefects(); // Refresh the list
                 }
-            });
+            } catch (error) {
+                console.error("Error viewing prefect:", error);
+                alert("Error loading prefect details. Please try again.");
+            }
         }
         
         function showDeleteModal(prefectId) {
@@ -142,7 +195,15 @@
         }
         
         // Set up modal event listeners
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if we're authenticated
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) {
+                document.getElementById('authError').style.display = 'block';
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
+            
             document.getElementById('confirmDelete').addEventListener('click', deletePrefect);
             document.getElementById('cancelDelete').addEventListener('click', hideDeleteModal);
             document.querySelector('.close').addEventListener('click', hideDeleteModal);
@@ -161,7 +222,3 @@
     </script>
 </body>
 </html>
-
-
-
-
