@@ -8,22 +8,22 @@
 </head>
 <body class="dashboard">
     <header class="header">
-    <div class="container header-content">
-        <div>
-            <h1>Prefect Attendance System</h1>
-            <small style="color: #f9c80e;">Logged in as: <span id="currentUser">Admin</span></small>
+        <div class="container header-content">
+            <div>
+                <h1>Prefect Attendance System</h1>
+                <small style="color: #f9c80e;">Logged in as: <span id="currentUser">Admin</span></small>
+            </div>
+            <button onclick="logout()" class="btn btn-secondary">Logout</button>
         </div>
-        <button onclick="logout()" class="btn btn-secondary">Logout</button>
-    </div>
-    <nav class="container">
-        <ul class="nav-menu">
-            <li class="nav-item"><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
-            <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
-            <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
-            <li class="nav-item"><a href="attendance.html" class="nav-link">Attendance Records</a></li>
-        </ul>
-    </nav>
-</header>
+        <nav class="container">
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li class="nav-item"><a href="register.html" class="nav-link">Register Prefect</a></li>
+                <li class="nav-item"><a href="view-prefects.html" class="nav-link">View Prefects</a></li>
+                <li class="nav-item"><a href="attendance.html" class="nav-link">Attendance Records</a></li>
+            </ul>
+        </nav>
+    </header>
 
     <main class="container main-content">
         <div class="card">
@@ -43,14 +43,21 @@
                     <a href="register.html" class="btn" style="margin-right: 10px;">Register New Prefect</a>
                     <a href="view-prefects.html" class="btn btn-secondary">View All Prefects</a>
                 </div>
+                
+                <!-- Debug section (remove in production) -->
+                <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                    <h3>Debug Information</h3>
+                    <button onclick="debugStorage()" class="btn btn-secondary" style="margin: 10px 0;">Check Storage</button>
+                    <p><small>Check browser console for debug information</small></p>
+                </div>
             </div>
         </div>
     </main>
 
-    <!-- QR Code libraries -->
+    <!-- Firebase and QR Code libraries -->
+    <script type="module" src="firebase.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-    <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
