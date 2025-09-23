@@ -157,13 +157,17 @@ async function logout() {
   }
 }
 
-// Prefects data management
+// Prefects data management - FIXED VERSION
 async function getPrefects() {
   try {
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.getAllPrefects) {
       console.log("Getting prefects from Firebase");
       const prefects = await window.firebaseFunctions.getAllPrefects();
-      console.log("Firebase prefects:", prefects);
+      console.log("Firebase prefects retrieved:", prefects);
+      
+      // Also sync to localStorage for fallback
+      localStorage.setItem('prefects', JSON.stringify(prefects));
+      
       return prefects;
     } else {
       // Fallback to localStorage if Firebase is not available
@@ -185,7 +189,12 @@ async function getPrefects() {
 async function getAttendanceByDate(date) {
   try {
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.getAttendanceByDate) {
-      return await window.firebaseFunctions.getAttendanceByDate(date);
+      const attendance = await window.firebaseFunctions.getAttendanceByDate(date);
+      // Also sync to localStorage for fallback
+      const currentAttendance = JSON.parse(localStorage.getItem('attendance') || '{}');
+      currentAttendance[date] = attendance;
+      localStorage.setItem('attendance', JSON.stringify(currentAttendance));
+      return attendance;
     } else {
       // Fallback to localStorage if Firebase is not available
       const attendanceData = JSON.parse(localStorage.getItem('attendance') || '{}');
@@ -227,13 +236,38 @@ function generateQRCode(text, elementId) {
   }
 }
 
-// Mark attendance
+// Mark attendance - FIXED VERSION
 async function markAttendanceWithFirestore(prefectId) {
   try {
+    console.log("Marking attendance for prefect ID:", prefectId);
+    
+    // First, get current prefects to verify the prefect exists
+    const prefects = await getPrefects();
+    const prefect = prefects.find(p => p.id === prefectId);
+    
+    if (!prefect) {
+      console.error("Prefect not found with ID:", prefectId);
+      return false;
+    }
+    
+    console.log("Found prefect:", prefect.name);
+    
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.markAttendance) {
       const timestamp = new Date().toISOString();
       const date = formatDate();
       await window.firebaseFunctions.markAttendance(prefectId, date, timestamp);
+      
+      // Also update localStorage for consistency
+      const attendanceData = JSON.parse(localStorage.getItem('attendance') || '{}');
+      if (!attendanceData[date]) {
+        attendanceData[date] = [];
+      }
+      attendanceData[date].push({
+        prefectId: prefectId,
+        timestamp: timestamp
+      });
+      localStorage.setItem('attendance', JSON.stringify(attendanceData));
+      
       return true;
     } else {
       // Fallback to localStorage if Firebase is not available
@@ -259,12 +293,26 @@ async function markAttendanceWithFirestore(prefectId) {
         timestamp: new Date().toISOString()
       });
       
-      // Update prefect's total attendance
-      const prefects = await getPrefects();
-      const prefectIndex = prefects.findIndex(p => p.id === prefectId);
-      if (prefectIndex !== -1) {
-        prefects[prefectIndex].totalAttendance = (prefects[prefectIndex].totalAttendance || 0) + 1;
-        localStorage.setItem('prefects', JSON.stringify(prefects));
+      // Update prefect's total attendance in both Firebase and localStorage
+      const updatedPrefects = prefects.map(p => {
+        if (p.id === prefectId) {
+          return { ...p, totalAttendance: (p.totalAttendance || 0) + 1 };
+        }
+        return p;
+      });
+      
+      // Update localStorage
+      localStorage.setItem('prefects', JSON.stringify(updatedPrefects));
+      
+      // If Firebase is available, update there too
+      if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.updatePrefect) {
+        try {
+          await window.firebaseFunctions.updatePrefect(prefectId, { 
+            totalAttendance: (prefect.totalAttendance || 0) + 1 
+          });
+        } catch (error) {
+          console.error("Error updating Firebase:", error);
+        }
       }
       
       localStorage.setItem('attendance', JSON.stringify(attendanceData));
@@ -276,52 +324,61 @@ async function markAttendanceWithFirestore(prefectId) {
   }
 }
 
-// Add a new prefect
+// Add a new prefect - FIXED VERSION
 async function addPrefectWithFirestore(prefect) {
   try {
+    let prefectId = prefect.id;
+    
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.addPrefect) {
-      const id = await window.firebaseFunctions.addPrefect(prefect);
-      console.log("Prefect added to Firebase with ID:", id);
-      return id;
-    } else {
-      // Fallback to localStorage if Firebase is not available
-      const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
-      const prefectId = prefect.id || 'P' + Date.now();
-      const newPrefect = { ...prefect, id: prefectId };
-      prefects.push(newPrefect);
-      localStorage.setItem('prefects', JSON.stringify(prefects));
-      console.log("Prefect added to localStorage with ID:", prefectId);
-      return prefectId;
+      // Remove the id before sending to Firebase (Firebase will generate its own)
+      const { id, ...prefectWithoutId } = prefect;
+      const firebaseId = await window.firebaseFunctions.addPrefect(prefectWithoutId);
+      prefectId = firebaseId; // Use Firebase-generated ID
+      console.log("Prefect added to Firebase with ID:", prefectId);
     }
+    
+    // Always update localStorage for consistency
+    const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
+    const newPrefect = { ...prefect, id: prefectId };
+    prefects.push(newPrefect);
+    localStorage.setItem('prefects', JSON.stringify(prefects));
+    console.log("Prefect added to localStorage with ID:", prefectId);
+    
+    return prefectId;
   } catch (error) {
     console.error("Error adding prefect:", error);
     throw error;
   }
 }
 
-// Delete a prefect
+// Delete a prefect - FIXED VERSION
 async function deletePrefectWithFirestore(prefectId) {
   try {
+    console.log("Deleting prefect with ID:", prefectId);
+    
     if (firebaseAvailable && window.firebaseFunctions && window.firebaseFunctions.deletePrefect) {
       await window.firebaseFunctions.deletePrefect(prefectId);
-    } else {
-      // Fallback to localStorage if Firebase is not available
-      const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
-      const prefectIndex = prefects.findIndex(p => p.id === prefectId);
+      console.log("Prefect deleted from Firebase");
+    }
+    
+    // Always update localStorage for consistency
+    const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
+    const prefectIndex = prefects.findIndex(p => p.id === prefectId);
+    
+    if (prefectIndex !== -1) {
+      prefects.splice(prefectIndex, 1);
+      localStorage.setItem('prefects', JSON.stringify(prefects));
+      console.log("Prefect deleted from localStorage");
       
-      if (prefectIndex !== -1) {
-        prefects.splice(prefectIndex, 1);
-        localStorage.setItem('prefects', JSON.stringify(prefects));
-        
-        // Clean up attendance records
-        const attendanceData = JSON.parse(localStorage.getItem('attendance') || '{}');
-        for (const date in attendanceData) {
-          attendanceData[date] = attendanceData[date].filter(
-            record => record.prefectId !== prefectId
-          );
-        }
-        localStorage.setItem('attendance', JSON.stringify(attendanceData));
+      // Clean up attendance records
+      const attendanceData = JSON.parse(localStorage.getItem('attendance') || '{}');
+      for (const date in attendanceData) {
+        attendanceData[date] = attendanceData[date].filter(
+          record => record.prefectId !== prefectId
+        );
       }
+      localStorage.setItem('attendance', JSON.stringify(attendanceData));
+      console.log("Attendance records cleaned up");
     }
   } catch (error) {
     console.error("Error deleting prefect:", error);
@@ -338,6 +395,55 @@ function debugStorage() {
   if (firebaseAvailable && window.firebaseFunctions.getAllPrefects) {
     window.firebaseFunctions.getAllPrefects().then(prefects => {
       console.log("Firebase prefects:", prefects);
+    }).catch(error => {
+      console.error("Error getting Firebase prefects:", error);
     });
+  }
+}
+
+// Function to sync data from localStorage to Firebase
+async function syncToFirebase() {
+  if (!firebaseAvailable) {
+    alert("Firebase is not available. Cannot sync data.");
+    return;
+  }
+  
+  try {
+    // Get data from localStorage
+    const prefects = JSON.parse(localStorage.getItem('prefects') || '[]');
+    const attendance = JSON.parse(localStorage.getItem('attendance') || '{}');
+    
+    // Sync prefects
+    for (const prefect of prefects) {
+      try {
+        // Check if prefect already exists in Firebase
+        const existingPrefects = await window.firebaseFunctions.getAllPrefects();
+        const exists = existingPrefects.some(p => p.id === prefect.id);
+        
+        if (!exists) {
+          await window.firebaseFunctions.addPrefect(prefect);
+          console.log("Synced prefect:", prefect.name);
+        }
+      } catch (error) {
+        console.error("Error syncing prefect:", error);
+      }
+    }
+    
+    // Sync attendance
+    for (const date in attendance) {
+      for (const record of attendance[date]) {
+        try {
+          await window.firebaseFunctions.markAttendance(record.prefectId, date, record.timestamp);
+          console.log("Synced attendance for:", record.prefectId, "on", date);
+        } catch (error) {
+          console.error("Error syncing attendance:", error);
+        }
+      }
+    }
+    
+    alert("Data sync completed!");
+  } catch (error) {
+    console.error("Error syncing data:", error);
+    alert("Error syncing data. Please check console for details.");
   }
 }
