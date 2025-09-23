@@ -90,26 +90,27 @@
         }
         
         let html5QrcodeScanner = null;
+        let prefectsData = []; // Store prefects data globally
         
         async function loadAttendance() {
             const selectedDate = document.getElementById('dateSelector').value;
             const attendanceData = await getAttendanceByDate(selectedDate);
             const tableBody = document.getElementById('attendanceTableBody');
-            const prefects = await getPrefects();
+            prefectsData = await getPrefects(); // Store prefects globally
             
             // Update date display
             dateDisplay.textContent = formatDateDisplay(selectedDate);
             
             // Update stats
-            document.getElementById('totalPrefects').textContent = prefects.length;
+            document.getElementById('totalPrefects').textContent = prefectsData.length;
             document.getElementById('presentToday').textContent = attendanceData.length;
             
-            const attendanceRate = prefects.length > 0 
-                ? Math.round((attendanceData.length / prefects.length) * 100) 
+            const attendanceRate = prefectsData.length > 0 
+                ? Math.round((attendanceData.length / prefectsData.length) * 100) 
                 : 0;
             document.getElementById('attendanceRate').textContent = attendanceRate + '%';
             
-            if (attendanceData.length === 0 && prefects.length === 0) {
+            if (attendanceData.length === 0 && prefectsData.length === 0) {
                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
                 return;
             }
@@ -123,7 +124,7 @@
             
             // Show present prefects
             attendanceData.forEach(record => {
-                const prefect = prefects.find(p => p.id === record.prefectId);
+                const prefect = prefectsData.find(p => p.id === record.prefectId);
                 if (prefect) {
                     const row = document.createElement('tr');
                     const time = new Date(record.timestamp).toLocaleTimeString();
@@ -141,7 +142,7 @@
             
             // Also show absent prefects
             const presentPrefectIds = attendanceData.map(record => record.prefectId);
-            const absentPrefects = prefects.filter(prefect => !presentPrefectIds.includes(prefect.id));
+            const absentPrefects = prefectsData.filter(prefect => !presentPrefectIds.includes(prefect.id));
             
             absentPrefects.forEach(prefect => {
                 const row = document.createElement('tr');
@@ -166,6 +167,7 @@
                 "qr-reader", { fps: 10, qrbox: 250 });
             
             html5QrcodeScanner.render((decodedText, decodedResult) => {
+                console.log("QR Code scanned:", decodedText);
                 // Handle successful scan
                 markAttendance(decodedText);
                 
@@ -187,17 +189,22 @@
             }
         });
         
-        async function markAttendance(prefectId) {
-            const prefects = await getPrefects();
-            const prefect = prefects.find(p => p.id === prefectId);
+        async function markAttendance(scannedData) {
+            console.log("Processing scanned data:", scannedData);
+            
+            // Try to find prefect by ID
+            const prefect = prefectsData.find(p => p.id === scannedData);
             
             if (!prefect) {
-                alert('Invalid QR code. Prefect not found.');
+                console.log("Prefect not found with ID:", scannedData);
+                alert('Invalid QR code. Prefect not found. Scanned ID: ' + scannedData);
                 return;
             }
             
+            console.log("Found prefect:", prefect.name);
+            
             try {
-                const success = await markAttendanceWithFirestore(prefectId);
+                const success = await markAttendanceWithFirestore(prefect.id);
                 
                 if (success) {
                     alert(`Attendance marked for ${prefect.name}`);
