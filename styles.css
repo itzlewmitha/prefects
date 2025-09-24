@@ -249,28 +249,108 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Face scan area */
-.face-scan-container {
-    width: 100%;
-    max-width: 400px;
-    margin: 0 auto;
+/* File Upload Scanner Styles */
+.scan-options {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.scan-option-btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+.upload-container {
     text-align: center;
+    margin: 20px 0;
 }
 
-.video-container {
-    width: 100%;
-    background-color: #eee;
+.upload-area {
+    border: 2px dashed #1a4f8e;
     border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 15px;
+    padding: 40px 20px;
+    cursor: pointer;
+    transition: background-color 0.3s;
 }
 
-#video {
-    width: 100%;
-    height: 300px;
-    object-fit: cover;
+.upload-area:hover {
+    background-color: #f8f9fa;
 }
 
+.upload-area.dragover {
+    background-color: #e3f2fd;
+    border-color: #0d3a73;
+}
+
+#fileInput {
+    display: none;
+}
+
+.preview-image {
+    max-width: 300px;
+    max-height: 300px;
+    margin: 15px auto;
+    display: block;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+}
+
+.hidden {
+    display: none;
+}
+
+.scanner-section {
+    margin-bottom: 30px;
+}
+
+/* Responsive design for scanners */
+@media (max-width: 768px) {
+    .scan-options {
+        flex-direction: column;
+    }
+    
+    .scan-option-btn {
+        min-width: 100%;
+    }
+    
+    .upload-area {
+        padding: 20px 10px;
+    }
+    
+    .preview-image {
+        max-width: 100%;
+    }
+}
+
+/* Scan result messages */
+.scan-success {
+    color: green;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.scan-error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.scan-warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
 /* Modal Styles */
 .modal {
     position: fixed;
@@ -418,3 +498,4 @@ body {
         align-items: flex-start;
     }
 }
+
