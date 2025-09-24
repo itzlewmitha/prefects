@@ -43,7 +43,7 @@ async function login(email, password) {
     } catch (error) {
       console.error("Firebase login failed:", error);
       // Fallback to simple auth
-      if (password === "10058") {
+      if (password === "100580") {
         localStorage.setItem('prefectAuth', 'true');
         return true;
       }
@@ -51,7 +51,7 @@ async function login(email, password) {
     }
   } else {
     // Fallback authentication
-    if (password === "10058") {
+    if (password === "100580") {
       localStorage.setItem('prefectAuth', 'true');
       return true;
     }
@@ -222,3 +222,4 @@ function formatDateDisplay(dateString) {
 document.addEventListener('DOMContentLoaded', function() {
   initializeApp();
 });
+
