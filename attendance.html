@@ -5,6 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance Records</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .scan-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .scan-option-btn {
+            flex: 1;
+            min-width: 150px;
+        }
+        .upload-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .upload-area {
+            border: 2px dashed #1a4f8e;
+            border-radius: 8px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            background-color: #e3f2fd;
+            border-color: #0d3a73;
+        }
+        #fileInput {
+            display: none;
+        }
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 15px auto;
+            display: block;
+            border-radius: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
 </head>
 <body class="dashboard">
     <header class="header">
@@ -26,14 +69,47 @@
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">Attendance Scanner</h2>
-                <button onclick="startScanner()" class="btn">Scan QR Code</button>
+                <div class="scan-options">
+                    <button onclick="startCameraScanner()" class="btn scan-option-btn">📷 Camera Scan</button>
+                    <button onclick="showFileUpload()" class="btn btn-secondary scan-option-btn">📁 Upload Image</button>
+                </div>
             </div>
             <div class="card-body">
-                <div id="scanner" style="display: none; text-align: center;">
-                    <div id="reader" style="width: 300px; margin: 0 auto;"></div>
-                    <button onclick="stopScanner()" class="btn btn-secondary" style="margin-top: 15px;">Stop Scanner</button>
+                <!-- Camera Scanner Section -->
+                <div id="cameraScanner" class="scanner-section">
+                    <div id="cameraContainer" style="display: none; text-align: center;">
+                        <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
+                        <button onclick="stopCameraScanner()" class="btn btn-secondary" style="margin-top: 15px;">Stop Camera</button>
+                    </div>
                 </div>
-                
+
+                <!-- File Upload Scanner Section -->
+                <div id="fileScanner" class="scanner-section hidden">
+                    <div class="upload-container">
+                        <div class="upload-area" onclick="document.getElementById('fileInput').click()" 
+                             ondragover="handleDragOver(event)" 
+                             ondragleave="handleDragLeave(event)" 
+                             ondrop="handleFileDrop(event)">
+                            <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+                            <div style="font-size: 48px;">📁</div>
+                            <h3>Upload QR Code Image</h3>
+                            <p>Click to select or drag and drop an image file</p>
+                            <p><small>Supported formats: JPG, PNG, GIF, BMP</small></p>
+                        </div>
+                        
+                        <div id="imagePreview" class="hidden">
+                            <img id="previewImage" class="preview-image" alt="QR Code Preview">
+                            <div>
+                                <button onclick="scanUploadedImage()" class="btn">Scan QR Code</button>
+                                <button onclick="clearUpload()" class="btn btn-secondary">Upload Different Image</button>
+                            </div>
+                        </div>
+                        
+                        <div id="scanResult" style="margin-top: 20px;"></div>
+                    </div>
+                </div>
+
+                <!-- Date Selection and Attendance Table -->
                 <div class="date-selector">
                     <label>Select Date: </label>
                     <input type="date" id="datePicker" value="${new Date().toISOString().split('T')[0]}">
@@ -41,6 +117,21 @@
                 </div>
                 
                 <h3>Attendance for <span id="selectedDate"></span></h3>
+                
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Prefects</div>
+                        <div class="stat-number" id="totalPrefects">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Present Today</div>
+                        <div class="stat-number" id="presentToday">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Attendance Rate</div>
+                        <div class="stat-number" id="attendanceRate">0%</div>
+                    </div>
+                </div>
                 
                 <table class="table">
                     <thead>
@@ -59,14 +150,32 @@
         </div>
     </main>
 
+    <!-- QR Code scanning library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <!-- JSQR library for image file scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script type="module" src="firebase.js"></script>
     <script src="script.js"></script>
     <script>
         let html5QrCode = null;
+        let currentScannerType = null;
+        let uploadedImageFile = null;
         
-        function startScanner() {
-            document.getElementById('scanner').style.display = 'block';
+        // Scanner type management
+        function showScanner(type) {
+            // Hide all scanner sections
+            document.querySelectorAll('.scanner-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show selected scanner
+            document.getElementById(type + 'Scanner').classList.remove('hidden');
+            currentScannerType = type;
+        }
+        
+        function startCameraScanner() {
+            showScanner('camera');
+            document.getElementById('cameraContainer').style.display = 'block';
             
             html5QrCode = new Html5Qrcode("reader");
             html5QrCode.start(
@@ -82,36 +191,168 @@
                     // Ignore scanning errors
                 }
             ).catch(err => {
-                console.error("Scanner error:", err);
-                alert("Camera access denied or not available");
+                console.error("Camera scanner error:", err);
+                alert("Camera access denied or not available. Please try file upload instead.");
+                showFileUpload();
             });
         }
         
-        function stopScanner() {
+        function stopCameraScanner() {
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
-                    document.getElementById('scanner').style.display = 'none';
+                    document.getElementById('cameraContainer').style.display = 'none';
                 }).catch(err => {
-                    console.error("Stop error:", err);
+                    console.error("Stop camera error:", err);
                 });
             }
         }
         
-        async function handleScannedCode(code) {
-            try {
-                const success = await markAttendance(code);
-                if (success) {
-                    alert('Attendance marked successfully!');
-                    stopScanner();
-                    loadAttendance(); // Refresh the view
-                } else {
-                    alert('Attendance already marked for today!');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
+        function showFileUpload() {
+            showScanner('file');
+            clearUpload();
+        }
+        
+        // File upload handling
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('dragover');
+        }
+        
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+        }
+        
+        function handleFileDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelection(files[0]);
             }
         }
         
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFileSelection(file);
+            }
+        }
+        
+        function handleFileSelection(file) {
+            // Validate file type
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please select a valid image file (JPG, PNG, GIF, BMP)');
+                return;
+            }
+            
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size too large. Please select an image smaller than 5MB.');
+                return;
+            }
+            
+            uploadedImageFile = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImage').src = e.target.result;
+                document.getElementById('imagePreview').classList.remove('hidden');
+                document.getElementById('scanResult').innerHTML = '';
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function scanUploadedImage() {
+            if (!uploadedImageFile) {
+                alert('Please select an image first');
+                return;
+            }
+            
+            const img = new Image();
+            img.onload = function() {
+                // Create canvas to process image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                // Get image data for QR code scanning
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Scan for QR code
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+                
+                if (code) {
+                    handleScannedCode(code.data);
+                } else {
+                    document.getElementById('scanResult').innerHTML = 
+                        '<div style="color: red; text-align: center;">No QR code found in the image. Please try another image.</div>';
+                }
+            };
+            
+            img.onerror = function() {
+                alert('Error loading image. Please try another file.');
+            };
+            
+            img.src = URL.createObjectURL(uploadedImageFile);
+        }
+        
+        function clearUpload() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('scanResult').innerHTML = '';
+            uploadedImageFile = null;
+        }
+        
+        // Common scanning handler
+        async function handleScannedCode(code) {
+            console.log('Scanned code:', code);
+            
+            // Validate the code format (should be a Firebase document ID)
+            if (!code || code.length < 5) {
+                showScanResult('Invalid QR code format', 'error');
+                return;
+            }
+            
+            try {
+                const success = await markAttendance(code);
+                if (success) {
+                    showScanResult('Attendance marked successfully!', 'success');
+                    if (currentScannerType === 'camera') {
+                        stopCameraScanner();
+                    } else {
+                        clearUpload();
+                    }
+                    loadAttendance(); // Refresh the view
+                } else {
+                    showScanResult('Attendance already marked for today!', 'warning');
+                }
+            } catch (error) {
+                showScanResult('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function showScanResult(message, type) {
+            const colors = {
+                success: 'green',
+                error: 'red',
+                warning: 'orange'
+            };
+            
+            document.getElementById('scanResult').innerHTML = 
+                `<div style="color: ${colors[type]}; text-align: center; font-weight: bold; padding: 10px; border: 1px solid ${colors[type]}; border-radius: 4px;">
+                    ${message}
+                </div>`;
+        }
+        
+        // Attendance display functions
         async function loadAttendance() {
             const date = document.getElementById('datePicker').value;
             document.getElementById('selectedDate').textContent = new Date(date).toLocaleDateString();
@@ -121,10 +362,21 @@
                 const prefects = await getPrefects();
                 const table = document.getElementById('attendanceTable');
                 
+                // Update stats
+                document.getElementById('totalPrefects').textContent = prefects.length;
+                document.getElementById('presentToday').textContent = attendance.length;
+                const attendanceRate = prefects.length > 0 ? Math.round((attendance.length / prefects.length) * 100) : 0;
+                document.getElementById('attendanceRate').textContent = attendanceRate + '%';
+                
                 // Get present prefect IDs
                 const presentIds = attendance.map(a => a.prefectId);
                 
                 table.innerHTML = '';
+                
+                if (prefects.length === 0) {
+                    table.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
+                    return;
+                }
                 
                 // Show all prefects with their status
                 prefects.forEach(prefect => {
@@ -137,17 +389,35 @@
                         <td>${prefect.grade}</td>
                         <td>${prefect.admission}</td>
                         <td>${attendanceRecord ? new Date(attendanceRecord.timestamp).toLocaleTimeString() : '-'}</td>
-                        <td><span style="color: ${isPresent ? 'green' : 'red'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span></td>
+                        <td><span style="color: ${isPresent ? 'green' : 'red'}; font-weight: bold;">${isPresent ? 'PRESENT' : 'ABSENT'}</span></td>
                     `;
                     table.appendChild(row);
                 });
             } catch (error) {
                 console.error('Error loading attendance:', error);
+                document.getElementById('attendanceTable').innerHTML = 
+                    '<tr><td colspan="5" style="text-align: center; color: red;">Error loading attendance data</td></tr>';
             }
         }
         
-        // Load today's attendance by default
-        document.addEventListener('DOMContentLoaded', loadAttendance);
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show file upload by default (more reliable than camera)
+            showFileUpload();
+            loadAttendance();
+            
+            // Add keyboard shortcut for quick scanning
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'u') {
+                    e.preventDefault();
+                    showFileUpload();
+                }
+                if (e.ctrlKey && e.key === 'c') {
+                    e.preventDefault();
+                    startCameraScanner();
+                }
+            });
+        });
     </script>
 </body>
 </html>
