@@ -47,6 +47,12 @@
         .hidden {
             display: none;
         }
+        .debug-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body class="dashboard">
@@ -72,6 +78,7 @@
                 <div class="scan-options">
                     <button onclick="startCameraScanner()" class="btn scan-option-btn">📷 Camera Scan</button>
                     <button onclick="showFileUpload()" class="btn btn-secondary scan-option-btn">📁 Upload Image</button>
+                    <button onclick="debugData()" class="btn" style="background-color: #6c757d;">🐛 Debug Data</button>
                 </div>
             </div>
             <div class="card-body">
@@ -109,11 +116,20 @@
                     </div>
                 </div>
 
+                <!-- Debug Section -->
+                <div class="debug-section">
+                    <h4>Debug Information</h4>
+                    <div id="debugInfo">
+                        Loading debug information...
+                    </div>
+                </div>
+
                 <!-- Date Selection and Attendance Table -->
                 <div class="date-selector">
                     <label>Select Date: </label>
-                    <input type="date" id="datePicker" value="${new Date().toISOString().split('T')[0]}">
+                    <input type="date" id="datePicker" value="">
                     <button onclick="loadAttendance()" class="btn">Load Attendance</button>
+                    <button onclick="loadToday()" class="btn btn-secondary">Today</button>
                 </div>
                 
                 <h3>Attendance for <span id="selectedDate"></span></h3>
@@ -141,9 +157,13 @@
                             <th>Admission No.</th>
                             <th>Time</th>
                             <th>Status</th>
+                            <th>Prefect ID</th>
                         </tr>
                     </thead>
                     <tbody id="attendanceTable">
+                        <tr>
+                            <td colspan="6" style="text-align: center;">Loading attendance data...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -154,12 +174,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <!-- JSQR library for image file scanning -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-    <script src="script.js"></script>
     <script type="module" src="firebase.js"></script>
+    <script src="script.js"></script>
     <script>
         let html5QrCode = null;
         let currentScannerType = null;
         let uploadedImageFile = null;
+        
+        // Set today's date as default
+        document.getElementById('datePicker').value = new Date().toISOString().split('T')[0];
         
         // Scanner type management
         function showScanner(type) {
@@ -331,6 +354,7 @@
                         clearUpload();
                     }
                     loadAttendance(); // Refresh the view
+                    updateDebugInfo(); // Update debug info
                 } else {
                     showScanResult('Attendance already marked for today!', 'warning');
                 }
@@ -352,15 +376,20 @@
                 </div>`;
         }
         
-        // Attendance display functions
+        // FIXED: Attendance display function
         async function loadAttendance() {
             const date = document.getElementById('datePicker').value;
-            document.getElementById('selectedDate').textContent = new Date(date).toLocaleDateString();
+            const displayDate = new Date(date + 'T00:00:00'); // Add time to avoid timezone issues
+            document.getElementById('selectedDate').textContent = displayDate.toLocaleDateString();
             
             try {
                 const attendance = await getAttendanceByDate(date);
                 const prefects = await getPrefects();
                 const table = document.getElementById('attendanceTable');
+                
+                console.log("Loading attendance for date:", date);
+                console.log("Prefects found:", prefects.length);
+                console.log("Attendance records found:", attendance.length);
                 
                 // Update stats
                 document.getElementById('totalPrefects').textContent = prefects.length;
@@ -368,15 +397,17 @@
                 const attendanceRate = prefects.length > 0 ? Math.round((attendance.length / prefects.length) * 100) : 0;
                 document.getElementById('attendanceRate').textContent = attendanceRate + '%';
                 
-                // Get present prefect IDs
-                const presentIds = attendance.map(a => a.prefectId);
-                
+                // Clear table
                 table.innerHTML = '';
                 
                 if (prefects.length === 0) {
-                    table.innerHTML = '<tr><td colspan="5" style="text-align: center;">No prefects registered yet.</td></tr>';
+                    table.innerHTML = '<tr><td colspan="6" style="text-align: center;">No prefects registered yet.</td></tr>';
                     return;
                 }
+                
+                // Get present prefect IDs for this date
+                const presentIds = attendance.map(a => a.prefectId);
+                console.log("Present prefect IDs:", presentIds);
                 
                 // Show all prefects with their status
                 prefects.forEach(prefect => {
@@ -385,28 +416,63 @@
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${prefect.name}</td>
-                        <td>${prefect.grade}</td>
-                        <td>${prefect.admission}</td>
+                        <td>${prefect.name || 'Unknown'}</td>
+                        <td>${prefect.grade || 'N/A'}</td>
+                        <td>${prefect.admission || 'N/A'}</td>
                         <td>${attendanceRecord ? new Date(attendanceRecord.timestamp).toLocaleTimeString() : '-'}</td>
                         <td><span style="color: ${isPresent ? 'green' : 'red'}; font-weight: bold;">${isPresent ? 'PRESENT' : 'ABSENT'}</span></td>
+                        <td><small>${prefect.id}</small></td>
                     `;
                     table.appendChild(row);
                 });
+                
+                updateDebugInfo();
+                
             } catch (error) {
                 console.error('Error loading attendance:', error);
                 document.getElementById('attendanceTable').innerHTML = 
-                    '<tr><td colspan="5" style="text-align: center; color: red;">Error loading attendance data</td></tr>';
+                    '<tr><td colspan="6" style="text-align: center; color: red;">Error loading attendance data: ' + error.message + '</td></tr>';
+            }
+        }
+        
+        function loadToday() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('datePicker').value = today;
+            loadAttendance();
+        }
+        
+        // Debug information display
+        async function updateDebugInfo() {
+            try {
+                const prefects = await getPrefects();
+                const date = document.getElementById('datePicker').value;
+                const attendance = await getAttendanceByDate(date);
+                const allAttendance = await getAllAttendance();
+                
+                const debugInfo = `
+                    <strong>Data Status:</strong><br>
+                    • Prefects in system: ${prefects.length}<br>
+                    • Attendance records for ${date}: ${attendance.length}<br>
+                    • Total attendance dates: ${Object.keys(allAttendance).length}<br>
+                    • Firebase ready: ${isFirebaseReady}<br>
+                    <small>Check browser console for detailed data</small>
+                `;
+                
+                document.getElementById('debugInfo').innerHTML = debugInfo;
+            } catch (error) {
+                document.getElementById('debugInfo').innerHTML = 'Error loading debug info: ' + error.message;
             }
         }
         
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            // Show file upload by default (more reliable than camera)
+            // Show file upload by default
             showFileUpload();
-            loadAttendance();
             
-            // Add keyboard shortcut for quick scanning
+            // Load today's attendance
+            loadToday();
+            
+            // Add keyboard shortcuts
             document.addEventListener('keydown', function(e) {
                 if (e.ctrlKey && e.key === 'u') {
                     e.preventDefault();
@@ -421,4 +487,3 @@
     </script>
 </body>
 </html>
-
